@@ -49,7 +49,7 @@ def gen_prompt(reviewer_jsons, prompt_jsons, skills_jsons, response, item):
 
     # skills =metrics
     skills = ""
-    metric_list = item["metrics"]
+    metric_list = item["skill"]
     for label in metric_list:
         for skill in skills_jsons:
             if label in skill["Skill"]:
@@ -63,7 +63,7 @@ def gen_prompt(reviewer_jsons, prompt_jsons, skills_jsons, response, item):
                 skills+=f"\nScore 4: {scoring['4']}"
                 skills+=f"\nScore 5: {scoring['5']}\n\n"
                 break
-    prompt = prompt_template.format(question=item["text"], response=response, skills=skills, num=3, sample_answer=item["answer"], **defaults)
+    prompt = prompt_template.format(question=item["instruction"], response=response, skills=skills, num=3, sample_answer=item["answer"], **defaults)
     return sys_prompt, prompt
 
 
@@ -111,24 +111,24 @@ if __name__ == '__main__':
     requests = []
     for i in question_idx_list:
         for row in answer_jsons:
-            if row.get('question_id') == question_jsons[i]['question_id']:
+            if row.get('question_id') == question_jsons[i]['idx']:
                 answer_elem = row
                 break
         answer_copy.append(answer_elem)
-        assert answer_copy[i]['question_id'] == question_jsons[i]['question_id']
+        assert answer_copy[i]['question_id'] == question_jsons[i]['idx']
         question_copy.append(question_jsons[i])
         sys_prompt, prompt = gen_prompt(reviewer_jsons, prompt_jsons, skills_jsons,answer_copy[i]["text"], question_jsons[i])
-        print(prompt)
+        # print(prompt)
         review_id = shortuuid.uuid()
         review_jsons.append({
             'review_id': review_id,
-            'question_id': question_jsons[i]['question_id'],
+            'question_id': question_jsons[i]['idx'],
             'metadata': {},
         })
         requests.append(
             {
                 'review_id': review_id,
-                'question_id': question_jsons[i]['question_id'],
+                'question_id': question_jsons[i]['idx'],
                 'metadata': {},
                 'request': {
                     "model": "gpt-4-0613",
@@ -149,11 +149,11 @@ if __name__ == '__main__':
             }
         )
 
-    openai_concurrent = OpenAIChatCompletionConcurrent(api_keys=key_jsons["api_keys"], requests_per_minute=60, expected_response_seconds=5)
+    openai_concurrent = OpenAIChatCompletionConcurrent(api_keys=key_jsons["api_keys"], requests_per_minute=180, expected_response_seconds=5)
     responses, fails = openai_concurrent.create_many(requests)
 
-    reviews = [response['response']['choices'][0]['message']['content'] for response in responses]
-    total_tokens = [response['response']['usage']['total_tokens'] for response in responses]
+    reviews = [response['response'].choices[0].message.content for response in responses]
+    total_tokens = [response['response'].usage.total_tokens for response in responses]
     print("total_token:", sum(total_tokens))
 
     output_directory = os.path.dirname(args.output_error_file)
@@ -185,7 +185,7 @@ if __name__ == '__main__':
             scores = parse_score(review, num)
             review_jsons[idx] = question_copy[idx]
             for row in answer_jsons:
-                if row.get('question_id') == question_copy[idx]['question_id']:
+                if row.get('question_id') == question_copy[idx]['idx']:
                     review_jsons[idx]['target_txt'] = row["text"]
             review_jsons[idx]['review'] = review
             review_jsons[idx]['score'] = scores
@@ -201,7 +201,7 @@ if __name__ == '__main__':
         lines = output_read_file.readlines()
         output_read_file.close()
     json_objects = [json.loads(line) for line in lines]
-    sorted_objects = sorted(json_objects, key=lambda obj: obj.get('question_id'))
+    sorted_objects = sorted(json_objects, key=lambda obj: obj.get('idx'))
 
     with open(f'{args.output_review_file}', 'w') as output_write_file:
         for obj in sorted_objects:
@@ -209,4 +209,4 @@ if __name__ == '__main__':
                 output_write_file.write(json.dumps(obj) + '\n')
             except Exception as e:
                 output_write_file.write('\n')
-                print(obj['question_id'])
+                print(obj['idx'])

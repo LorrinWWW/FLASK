@@ -12,7 +12,7 @@ import fcntl
 
 from typing import List
 import os
-
+import tqdm
 
 from tenacity import (
     retry,
@@ -42,6 +42,11 @@ class OpenAIChatCompletionConcurrent:
         self.requests_per_minute = requests_per_minute
         self.expected_response_seconds = expected_response_seconds
 
+        if len(api_keys) == 0:
+            api_key = os.environ.get('OPENAI_API_KEY', None)
+            assert api_key is not None
+            self.api_keys = [api_key]
+
         self.num_api_keys = len(self.api_keys)
 
         requests_per_second = self.requests_per_minute / 60
@@ -68,7 +73,7 @@ class OpenAIChatCompletionConcurrent:
 
         futures = []
         with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
-            for item_index, item in enumerate(requests):
+            for item_index, item in enumerate(tqdm.tqdm(requests)):
                 api_key = self.api_keys[item_index % self.num_api_keys]    
                 future = executor.submit(call_and_return, api_key=api_key, item=item)
                 futures.append(future)
@@ -141,8 +146,10 @@ def call_and_write(api_key: str, item: dict, output_path: str, fail_path: str):
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6), reraise=True)
 def completion_with_backoff(api_key, **kwargs):
-    openai.api_key = api_key
-    return openai.ChatCompletion.create(**kwargs)
+    client = openai.OpenAI(
+        api_key=api_key,
+    )
+    return client.chat.completions.create(**kwargs)
 
 
 if __name__ == "__main__":

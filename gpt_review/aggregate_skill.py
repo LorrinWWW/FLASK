@@ -26,20 +26,20 @@ with open(file, 'r') as f:
 skill_dict = {}
 cnt=0
 for index, item in enumerate(review):
-    if len(item["score"])!=3:
-        print("length issue!!!", item["score"], item )
+    # if len(item["score"])!=3:
+        # print("length issue!!!", item["score"], item )
     for key, score in item["score"].items():
         if key.split(' ')[0] not in skill_dict.keys():
             if 'logical' in key:
                 # print(key)
                 try:
                     if key.split(' ')[1] not in skill_dict:
-                        print(key)
+                        # print(key)
                         skill_dict[key.split(' ')[1]]=[0,0]
                 except:
                     print(file, key, index)
             else:
-                print(key)
+                # print(key)
                 skill_dict[key.split(' ')[0]]=[0,0]
         if item["score"][key] == "N/A":
             cnt+=1
@@ -60,7 +60,7 @@ for index, item in enumerate(review):
 key_order = ["robustness", "correctness", "efficiency", "factuality", "commonsense", "comprehension", "insightfulness", "completeness",  "metacognition","readability", "conciseness", "harmlessness"]
 ordered_dict = OrderedDict((key, skill_dict[key]) for key in key_order if key in skill_dict)
 
-file_name = file.split('/')[1].split('.jsonl')[0]
+file_name = file.split('/')[-1].split('.jsonl')[0]
 
 file_directory = 'outputs/stats/'
 output_directory = os.path.dirname(file_directory)
